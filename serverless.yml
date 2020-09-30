@@ -1,0 +1,97 @@
+service: cognito-auth
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: dev
+  region: eu-west-1
+
+functions:
+  create-auth:
+    handler: create-auth-challenge.handler
+    environment:
+      MAGIC_LINK_CLIENT_ID: !Ref MagicLinkPoolClient
+      GOOGLE_CLIENT_ID: !Ref GooglePoolClient
+    events:
+      - cognitoUserPool:
+          pool: UserPool
+          trigger: CreateAuthChallenge
+  define-auth:
+    handler: define-auth-challenge.handler
+    environment:
+      MAGIC_LINK_CLIENT_ID: !Ref MagicLinkPoolClient
+      GOOGLE_CLIENT_ID: !Ref GooglePoolClient
+    events:
+      - cognitoUserPool:
+          pool: UserPool
+          trigger: DefineAuthChallenge
+  verify-auth:
+    handler: verify-auth-challenge.handler
+    environment:
+      MAGIC_LINK_CLIENT_ID: !Ref MagicLinkPoolClient
+      GOOGLE_CLIENT_ID: !Ref GooglePoolClient
+    events:
+      - cognitoUserPool:
+          pool: UserPool
+          trigger: VerifyAuthChallengeResponse
+  pre-signup:
+    handler: pre-signup.handler
+    events:
+      - cognitoUserPool:
+          pool: UserPool
+          trigger: PreSignUp
+  api-start:
+    handler: magiclink-start.handler
+    environment:
+      POOL_CLIENT_ID: !Ref MagicLinkPoolClient
+    events:
+      - http:
+          path: magiclink/start
+          method: POST
+  api-complete:
+    handler: magiclink-complete.handler
+    environment:
+      POOL_CLIENT_ID: !Ref MagicLinkPoolClient
+    events:
+      - http:
+          path: magiclink/complete
+          method: POST
+  api-google:
+    handler: google.handler
+    environment:
+      POOL_CLIENT_ID: !Ref GooglePoolClient
+    events:
+      - http:
+          path: google
+          method: POST
+
+resources:
+  Resources:
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${self:provider.stage}-pool
+        UsernameAttributes:
+          - email
+        UsernameConfiguration:
+          CaseSensitive: false
+
+    MagicLinkPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        UserPoolId: !Ref UserPool
+        ClientName: ${self:service}-${self:provider.stage}-magiclink
+        ExplicitAuthFlows:
+          - ALLOW_CUSTOM_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        RefreshTokenValidity: 30
+
+    GooglePoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        UserPoolId: !Ref UserPool
+        ClientName: ${self:service}-${self:provider.stage}-google
+        ExplicitAuthFlows:
+          - ALLOW_CUSTOM_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        RefreshTokenValidity: 30
